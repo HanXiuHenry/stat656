@@ -1,0 +1,195 @@
+---
+title: 'Covid-19 Cluster in US'
+output:
+  html_document: default
+---
+  
+# Introduction
+In this project, we do cluster analysis for different counties in US based on the Covid-19 data. We use the data of 09/01/2020. The data is from the Center for Systems Science and Engineering (CSSE) at Johns Hopkins University([link](https://github.com/CSSEGISandData/COVID-19)).
+
+# Loading packages
+```{r}
+packs = c('dplyr','ggplot2','AppliedPredictiveModeling', 'e1071', 'caret', 'RANN', 'corrplot')
+lapply(packs,require,character.only=TRUE)
+```
+
+# Reading in the data
+```{r}
+covidData <- read.csv("09-01-2020.csv")
+str(covidData)
+```
+
+This data set contains the covid-19 case data for different regions around the world on 09/01/2020. Since we only do cluster analysis for counties in US, we select some particular data from it.
+```{r}
+covidUS <- filter(covidData, Country_Region=='US')
+```
+
+# Data preprocessing
+Check the description for each feature.
+```{r}
+colnames(covidUS)
+```
+FIPS: Federal Information Processing Standards code that uniquely identifies counties within the USA. Drop this feature.
+
+Admin2: County name.  Drop this feature.
+
+Province_State: Province, state or dependency name. Separate this feature for future use.
+
+Country_Region: Country, region or sovereignty name. The names of locations included on the Website correspond with the official designations used by the U.S. Department of State. Separate this feature for future use.
+
+Last Update: MM/DD/YYYY HH:mm:ss (24 hour format, in UTC). Drop this feature.
+
+Lat and Long_: Dot locations on the dashboard. All points (except for Australia) shown on the map are based on geographic centroids, and are not representative of a specific address, building or any location at a spatial scale finer than a province/state. Australian dots are located at the centroid of the largest city in each state. Drop these two features.
+
+Confirmed: Counts include confirmed and probable (where reported).
+
+Deaths: Counts include confirmed and probable (where reported).
+
+Recovered: Recovered cases are estimates based on local media reports, and state and local reporting when available, and therefore may be substantially lower than the true number. 
+
+Active: Active cases = total cases - total recovered - total deaths.
+
+Combined_Key: County name, state name and country name. Separate this feature for future use.
+
+Incidence_Rate: Incidence Rate = cases per 100,000 persons.
+
+Case-Fatality Ratio (%): Case-Fatality Ratio (%) = Number recorded deaths / Number cases.
+```{r}
+state <- select(covidUS, Province_State)
+county <- select(covidUS, Country_Region)
+countyState <- select(covidUS, Combined_Key)
+covidUS <- select(covidUS, -FIPS, -Admin2, -Province_State, -Country_Region, -Last_Update, -Lat, -Long_, -Combined_Key)
+```
+
+### Missing Data
+Find out if there are missing data.
+```{r}
+anyNA(covidUS)
+```
+
+Check the number of missing values for each feature.
+```{r}
+sapply(covidUS, function(x) sum(is.na(x)))
+```
+
+Check the number of missing values for each observation.
+```{r}
+rowMissNum <- is.na(covidUS) %>% apply(1,sum)
+summary(rowMissNum)
+```
+Delete the observations which miss 3 features. 
+```{r}
+missRowIndex <- which(rowMissNum==3) 
+covidUS <- covidUS[-missRowIndex,]
+```
+
+Check the number of missing values for each feature again.
+```{r}
+sapply(covidUS, function(x) sum(is.na(x)))
+```
+Check the missing values of Case.Fatality_Ratio.
+```{r}
+FatalRateMissDf <- which(is.na(covidUS$Case.Fatality_Ratio)) %>% covidUS[.,]
+FatalRateMissDf
+```
+
+We find some problems with this data set.
+
+If Confirmed, Death, Recovered and Active are all zero, it means that there is no case in this county. Thus, Incidence_Rate and Case.Fatality_Ratio should all be zero.
+```{r}
+FourFeatZeroIndex <- which(covidUS$Confirmed==0 & covidUS$Deaths==0 & covidUS$Recovered==0 & covidUS$Active==0)
+covidUS[FourFeatZeroIndex, 5] = 0
+covidUS[FourFeatZeroIndex, 6] = 0
+```
+
+Check the missing values of Case.Fatality_Ratio again.
+```{r}
+sapply(covidUS, function(x) sum(is.na(x)))
+FatalRateMissIndex <- which(is.na(covidUS$Case.Fatality_Ratio))
+covidUS[FatalRateMissIndex,]
+```
+
+For row 795, 1240 and 1925, it seems that all features except Deaths are missing. Delete these observations. For row 2441, the data is problematic. Delete this observations.
+```{r}
+covidUS <- covidUS[-FatalRateMissIndex,]
+```
+
+
+Check the missing values of Incidence_Rate.
+```{r}
+IncRateMissDf <- which(is.na(covidUS$Incidence_Rate)) %>% covidUS[.,]
+IncRateMissDf
+```
+
+Impute the missing data in Incidence_Rate. Use K nearest neighbors imputation. When use this method by Caret package, it will automatically standardize the data. Before this, check the variance of each feature.
+```{r}
+apply(covidUS, 2, var)
+```
+
+The variance of Recovered is 0. Drop this feature.
+```{r}
+covidUS <- select(covidUS, -Recovered)
+```
+
+Then perform K nearest neighbors imputation on Incidence_Rate.
+```{r}
+covidUS <- covidUS %>% preProcess(method="knnImpute", k=5) %>% predict(newdata=covidUS)
+```
+
+Check if there are missing values.
+```{r}
+sum(is.na(covidUS))
+```
+
+There is no missing value now.
+
+### Correlation
+First, check the correlation matrix of the features.
+```{r}
+corrCovid <- cov(covidUS)
+corrCovid
+```
+
+Visualize the correlations.
+```{r}
+corrplot(corrCovid, order="hclust")
+```
+
+We can see that there is strong correlation between Active, Confirmed and Death. It is reasonable that there is strong correlation between Confirmed and Deaths because more confirmed cases usually indicate more death cases. From the description of this data set, we know that: active cases = total cases - total recovered - total deaths. Thus, Active is a linear combination of Confirmed and Death. We can drop Active.
+```{r}
+covidUS <- select(covidUS, -Active)
+```
+
+# K-means Clustering
+Perform K-means clustering on this data set. Use CH index to pick k. Set the maximum number of clusters to 15. Set the number of random start to 10.
+```{r}
+chIndex = function(x,kmax,iter.max=100,nstart=10,
+algorithm="Lloyd")
+{
+  ch = numeric(length=kmax-1)
+  n = nrow(x)
+  for (k in 2:kmax) {
+    a = kmeans(x,k,iter.max=iter.max,nstart=nstart,
+    algorithm=algorithm)
+    w = a$tot.withinss
+    b = a$betweenss
+    ch[k-1] = (b/(k-1))/(w/(n-k))
+   }
+  return(list(k=2:kmax,ch=ch))
+}
+
+chCovid <- chIndex(x=covidUS, kmax=15)
+maxCH <- max(chCovid$ch)
+k <- chCovid$k[which(chCovid$ch == maxCH)]
+maxCH
+k
+```
+
+The k which produces the maximum CH is `r maxCH`. The maximum CH is `r k`.
+
+Plot the CH plot.
+```{r}
+plot(x=chCovid$k, y=chCovid$ch, type="b", xlab="K", ylab="CH")
+```
+
+# Hierarchical Clustering
