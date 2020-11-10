@@ -161,7 +161,7 @@ covidUS <- select(covidUS, -Active)
 ```
 
 # K-means Clustering
-Perform K-means clustering on this data set. Use CH index to pick k. Set the maximum number of clusters to 15. Set the number of random start to 10.
+Apply K-means clustering to this data set. Use CH index to pick k. Set the maximum number of clusters to 10. Set the number of random start to 10.
 ```{r}
 chIndex = function(x,kmax,iter.max=100,nstart=10,
 algorithm="Lloyd")
@@ -178,18 +178,41 @@ algorithm="Lloyd")
   return(list(k=2:kmax,ch=ch))
 }
 
-chCovid <- chIndex(x=covidUS, kmax=15)
+chCovid <- chIndex(x=covidUS, kmax=10)
 maxCH <- max(chCovid$ch)
 k <- chCovid$k[which(chCovid$ch == maxCH)]
 maxCH
 k
 ```
 
-The k which produces the maximum CH is `r maxCH`. The maximum CH is `r k`.
+The k which produces the maximum CH is 7. The maximum CH is 1678.5.
 
 Plot the CH plot.
 ```{r}
 plot(x=chCovid$k, y=chCovid$ch, type="b", xlab="K", ylab="CH")
 ```
 
+Produce the 7 clusters.
+```{r}
+kmeansOut <- kmeans(covidUS, centers=7)
+kmeansCluster <- kmeansOut$cluster
+```
+
+
 # Hierarchical Clustering
+Apply hierarchical clustering to this data set. Use average linkage.
+```{r}
+Delta <- dist(covidUS)
+outAverage <- hclust(Delta, method='average')
+plot(outAverage)
+```
+
+Cut the tree to produce 7 clusters.
+```{r}
+hierCluster <- cutree(outAverage, k=7)
+```
+
+
+
+
+
