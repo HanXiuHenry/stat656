@@ -198,19 +198,80 @@ kmeansOut <- kmeans(covidUS, centers=7)
 kmeansCluster <- kmeansOut$cluster
 ```
 
+Check the number of observations in each cluster.
+```{r}
+table(kmeansCluster)
+```
+
 
 # Hierarchical Clustering
 Apply hierarchical clustering to this data set. Use average linkage.
 ```{r}
 Delta <- dist(covidUS)
-outAverage <- hclust(Delta, method='average')
-plot(outAverage)
+hieraAve <- hclust(Delta, method='average')
+plot(hieraAve)
 ```
 
 Cut the tree to produce 7 clusters.
 ```{r}
-hierCluster <- cutree(outAverage, k=7)
+hieraAveClust <- cutree(hieraAve, k=7)
 ```
+
+Check the number of observations in each cluster.
+```{r}
+table(hieraAveClust)
+```
+
+Use single linkage.
+```{r}
+hieraSing <- hclust(Delta, method='single')
+plot(hieraSing)
+```
+
+Cut this tree to produce 7 clusters.
+```{r}
+hieraSingClust <- cutree(hieraSing, k=7)
+```
+
+Check the number of observations in each cluster.
+```{r}
+table(hieraSingClust)
+```
+
+Use complete linkage.
+```{r}
+hieraComp <- hclust(Delta, method='complete')
+plot(hieraComp)
+```
+Cut this tree to produce 7 clusters.
+```{r}
+hieraCompClust <- cutree(hieraComp, k=7)
+```
+
+Check the number of observations in each cluster.
+```{r}
+table(hieraCompClust)
+```
+
+Use centroid linkage.
+```{r}
+hieraCent <- hclust(Delta, method='centroid')
+plot(hieraCent)
+```
+
+Cut this tree to produce 7 clusters.
+```{r}
+hieraCentClust <- cutree(hieraCent, k=7)
+```
+
+Check the number of observations in each cluster.
+```{r}
+table(hieraCentClust)
+```
+For 4 hierachical clusterings with different linkages, almost all counties are assigned to one cluster.
+
+
+
 
 
 
