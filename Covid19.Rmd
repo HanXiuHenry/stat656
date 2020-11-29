@@ -56,7 +56,6 @@ Incidence_Rate: Incidence Rate = cases per 100,000 persons.
 Case-Fatality Ratio (%): Case-Fatality Ratio (%) = Number recorded deaths / Number cases.
 ```{r}
 state <- select(covidUS, Province_State)
-county <- select(covidUS, Country_Region)
 countyState <- select(covidUS, Combined_Key)
 covidUS <- select(covidUS, -FIPS, -Admin2, -Province_State, -Country_Region, -Last_Update, -Lat, -Long_, -Combined_Key)
 ```
@@ -81,6 +80,7 @@ Delete the observations which miss 3 features.
 ```{r}
 missRowIndex <- which(rowMissNum==3) 
 covidUS <- covidUS[-missRowIndex,]
+state <- state[-missRowIndex,]
 ```
 
 Check the number of missing values for each feature again.
@@ -112,6 +112,7 @@ covidUS[FatalRateMissIndex,]
 For row 795, 1240 and 1925, it seems that all features except Deaths are missing. Delete these observations. For row 2441, the data is problematic. Delete this observations.
 ```{r}
 covidUS <- covidUS[-FatalRateMissIndex,]
+state <- state[-FatalRateMissIndex]
 ```
 
 
@@ -270,7 +271,46 @@ table(hieraCentClust)
 ```
 For 4 hierachical clusterings with different linkages, almost all counties are assigned to one cluster.
 
+# States
 
+In each K-means cluster, group counties by the states they belong to. Then check the number of counties in each state.
+
+```{r}
+cluster1State <- state[kmeansCluster==1]
+head(sort(table(cluster1State), decreasing = TRUE), n=3)
+```
+
+```{r}
+cluster2State <- state[kmeansCluster==2]
+head(sort(table(cluster2State), decreasing = TRUE), n=3)
+```
+
+```{r}
+cluster3State <- state[kmeansCluster==3]
+head(sort(table(cluster3State), decreasing = TRUE), n=3)
+```
+
+```{r}
+cluster4State <- state[kmeansCluster==4]
+head(sort(table(cluster4State), decreasing = TRUE), n=3)
+```
+
+```{r}
+cluster5State <- state[kmeansCluster==5]
+head(sort(table(cluster5State), decreasing = TRUE), n=3)
+```
+
+```{r}
+cluster6State <- state[kmeansCluster==6]
+head(sort(table(cluster6State), decreasing = TRUE), n=3)
+```
+
+```{r}
+cluster7State <- state[kmeansCluster==7]
+head(sort(table(cluster7State), decreasing = TRUE), n=3)
+```
+
+We can see that, in different clusters, the states which contain the most counties are different. For example, in cluster 4, Texas contains the most counties. In cluster 7, Georgia contains the most counties.
 
 
 
